@@ -2,30 +2,29 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: bronze-ingest
-    namespace: etl-medallion
+  namespace: etl-medallion
+spec:
+  schedule: "0 2 * * *" # nightly, 02:00 - matches source system export window
+  jobTemplate:
     spec:
-      schedule: "0 2 * * *" # nightly, 02:00 - matches source system export window
-        jobTemplate:
-            spec:
-                  template:
-                          spec:
-                                    nodeSelector:
-                                                workload: etl-medallion
-                                                          tolerations:
-                                                                      - key: workload
-                                                                                    operator: Equal
-                                                                                                  value: etl-medallion
-                                                                                                                effect: NoSchedule
-                                                                                                                          containers:
-                                                                                                                                      - name: bronze-ingest
-                                                                                                                                                    image: acrenergyprod.azurecr.io/energy-pipelines/bronze-ingest:latest
-                                                                                                                                                                  command: ["python", "pipelines/bronze/ingest_meter_readings.py"]
-                                                                                                                                                                                resources:
-                                                                                                                                                                                                requests:
-                                                                                                                                                                                                                  cpu: "500m"
-                                                                                                                                                                                                                                    memory: "1Gi"
-                                                                                                                                                                                                                                                    limits:
-                                                                                                                                                                                                                                                                      cpu: "2"
-                                                                                                                                                                                                                                                                                        memory: "4Gi"
-                                                                                                                                                                                                                                                                                                  restartPolicy: OnFailure
-                                                                                                                                                                                                                                                                                                  
+      template:
+        spec:
+          nodeSelector:
+            workload: etl-medallion
+          tolerations:
+            - key: workload
+              operator: Equal
+              value: etl-medallion
+              effect: NoSchedule
+          containers:
+            - name: bronze-ingest
+              image: acrenergyprod.azurecr.io/energy-pipelines/bronze-ingest:latest
+              command: ["python", "pipelines/bronze/ingest_meter_readings.py"]
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+          restartPolicy: OnFailure
