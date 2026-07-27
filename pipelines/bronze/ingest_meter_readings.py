@@ -1,33 +1,47 @@
+"""Bronze layer: raw ingestion for the energy data medallion pipeline.
+
+Reads raw source extracts (smart meter readings, field sensor telemetry,
+billing export) and lands them as-is, partitioned by ingestion date, with
+no transformation or validation. This preserves an auditable copy of the
+data exactly as received from source systems.
 """
-Bronze layer - raw ingestion.
 
-Pulls smart-meter readings, field-sensor telemetry and billing exports from
-source systems and lands them AS-IS into ADLS Gen2 bronze/, partitioned by
-ingestion date. No transformation happens here - bronze is the immutable,
-audit-friendly record of exactly what was received.
-"""
-from datetime import datetime, timezone
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import lit
+from datetime import date
 
 
-def ingest(source_paths: dict, bronze_root: str) -> None:
-      spark = SparkSession.builder.appName("bronze-ingest-energy").getOrCreate()
-      run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def ingest(spark: SparkSession, source_paths: dict, bronze_root: str) -> None:
+    """Copy each raw source into the bronze layer, partitioned by ingestion_date.
 
-    for source_name, path in source_paths.items():
-              df = spark.read.option("multiline", "true").json(path)
-              target = f"{bronze_root}/{source_name}/ingestion_date={run_date}"
-              df.write.mode("append").json(target)
-              print(f"[bronze] {source_name}: {df.count()} records -> {target}")
+    Args:
+        spark: active SparkSession.
+        source_paths: mapping of dataset name -> source path (JSON).
+        bronze_root: root path of the bronze layer (e.g. abfss://bronze@...).
+    """
+    ingestion_date = date.today().isoformat()
+
+    for dataset_name, source_path in source_paths.items():
+        df: DataFrame = spark.read.json(source_path)
+        df = df.withColumn("ingestion_date", lit(ingestion_date))
+        target_path = f"{bronze_root}/{dataset_name}"
+        (
+            df.write
+            .mode("append")
+            .partitionBy("ingestion_date")
+            .format("delta")
+            .save(target_path)
+        )
+        print(f"Ingested {dataset_name} -> {target_path} (ingestion_date={ingestion_date})")
 
 
 if __name__ == "__main__":
-      ingest(
-                source_paths={
-                              "smart_meter_readings": "abfss://landing@energydatalakeprod.dfs.core.windows.net/meters/",
-                              "field_sensor_telemetry": "abfss://landing@energydatalakeprod.dfs.core.windows.net/sensors/",
-                              "billing_export": "abfss://landing@energydatalakeprod.dfs.core.windows.net/billing/",
-                },
-                bronze_root="abfss://bronze@energydatalakeprod.dfs.core.windows.net",
-      )
-  
+    spark = SparkSession.builder.appName("bronze-ingest-meter-readings").getOrCreate()
+
+    source_paths = {
+        "smart_meter_readings": "abfss://landing@energydatalakeprod.dfs.core.windows.net/smart_meter_readings/",
+        "field_sensor_telemetry": "abfss://landing@energydatalakeprod.dfs.core.windows.net/field_sensor_telemetry/",
+        "billing_export": "abfss://landing@energydatalakeprod.dfs.core.windows.net/billing_export/",
+    }
+
+    ingest(spark, source_paths, bronze_root="abfss://bronze@energydatalakeprod.dfs.core.windows.net")
