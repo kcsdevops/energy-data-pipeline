@@ -1,15 +1,15 @@
 variable "storage_account_name" {
-    type        = string
-    description = "Globally unique storage account name for the data lake"
+  type        = string
+  description = "Globally unique storage account name for the data lake"
 }
 
 variable "resource_group_name" {
-    type = string
+  type = string
 }
 
 variable "location" {
-    type    = string
-    default = "brazilsouth"
+  type    = string
+  default = "brazilsouth"
 }
 
 variable "tags" {
@@ -18,7 +18,7 @@ variable "tags" {
 }
 
 output "storage_account_id" {
-    value = azurerm_storage_account.datalake.id
+  value = azurerm_storage_account.datalake.id
 }
 
 output "primary_dfs_endpoint" {
