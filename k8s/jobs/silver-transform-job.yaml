@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: silver-transform-job
+  namespace: etl-medallion
+  labels:
+    app: energy-data-pipeline
+    stage: silver
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: energy-data-pipeline
+        stage: silver
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        workload: etl-medallion
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "etl-medallion"
+          effect: "NoSchedule"
+      containers:
+        - name: silver-transform
+          image: energyacr.azurecr.io/energy-pipelines:latest
+          command: ["python", "pipelines/silver/clean_transform.py"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
