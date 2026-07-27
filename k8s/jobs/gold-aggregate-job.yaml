@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gold-aggregate-job
+  namespace: etl-medallion
+  labels:
+    app: energy-data-pipeline
+    stage: gold
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: energy-data-pipeline
+        stage: gold
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        workload: etl-medallion
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "etl-medallion"
+          effect: "NoSchedule"
+      containers:
+        - name: gold-aggregate
+          image: energyacr.azurecr.io/energy-pipelines:latest
+          command: ["python", "pipelines/gold/aggregate_kpis.py"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
